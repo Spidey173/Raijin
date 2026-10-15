@@ -13,12 +13,20 @@ def parse_date(date_str: str) -> Optional[date]:
     except ValueError:
         return None
 
+import re
+
 def parse_amount(amount_str: Any) -> Optional[float]:
     if amount_str is None:
         return None
+    if isinstance(amount_str, (int, float)):
+        return round(float(amount_str), 2)
+    s = str(amount_str).strip()
+    clean_str = re.sub(r"[^\d\.]", "", s)
+    if not clean_str:
+        return None
     try:
-        return float(amount_str)
-    except (ValueError, TypeError):
+        return round(float(clean_str), 2)
+    except ValueError:
         return None
 
 def clean_csv(file_path: str) -> Tuple[List[Dict[str, Any]], int, int]:
