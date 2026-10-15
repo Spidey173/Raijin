@@ -21,11 +21,19 @@ def parse_amount(amount_str: Any) -> Optional[float]:
     if isinstance(amount_str, (int, float)):
         return round(float(amount_str), 2)
     s = str(amount_str).strip()
+    is_negative = False
+    if s.startswith("(") and s.endswith(")"):
+        is_negative = True
+        s = s[1:-1].strip()
+    elif s.startswith("-"):
+        is_negative = True
+        s = s[1:].strip()
     clean_str = re.sub(r"[^\d\.]", "", s)
     if not clean_str:
         return None
     try:
-        return round(float(clean_str), 2)
+        val = round(float(clean_str), 2)
+        return -val if is_negative else val
     except ValueError:
         return None
 
