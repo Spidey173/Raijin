@@ -124,7 +124,23 @@ def clean_csv(file_path: str) -> Tuple[List[Dict[str, Any]], int, int]:
                 raw_notes = row.get("notes", "").strip()
                 notes = raw_notes if raw_notes else None
 
-                # (Deduplication filter pending)
+                # Deduplication logic
+                if txn_id:
+                    if txn_id in seen_txn_ids:
+                        continue
+                    seen_txn_ids.add(txn_id)
+                else:
+                    fallback_sig = (
+                        parsed_date.isoformat() if parsed_date else None,
+                        merchant.upper() if merchant else None,
+                        parsed_amount,
+                        currency,
+                        status,
+                        account_id
+                    )
+                    if fallback_sig in seen_fallback_signatures:
+                        continue
+                    seen_fallback_signatures.add(fallback_sig)
 
                 cleaned_rows.append({
                     "txn_id": txn_id,
