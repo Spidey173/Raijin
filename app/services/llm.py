@@ -293,12 +293,12 @@ def classify_categories_batch(transactions: List[Dict[str, Any]]) -> List[Tuple[
     if not transactions:
         return []
 
-    # Map items sequentially (naive list index)
+    # Map items by unique ID (either txn['id'] or txn['index'] or row index)
     items_to_classify = []
     id_map = {}
     for i, txn in enumerate(transactions):
-        item_id = i
-        id_map[str(i)] = i
+        item_id = txn.get("id") if txn.get("id") is not None else txn.get("index", i)
+        id_map[str(item_id)] = item_id
         items_to_classify.append({
             "id": item_id,
             "index": item_id,
