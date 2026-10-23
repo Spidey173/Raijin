@@ -36,7 +36,7 @@ def process_csv_job(job_id_str: str) -> str:
             return f"Job {job_id_str} not found."
 
         job.status = "processing"
-        pass  # Progress tracking hook
+        job.progress = "10%"
         db.commit()
 
         # Build file path
@@ -45,7 +45,7 @@ def process_csv_job(job_id_str: str) -> str:
             error_msg = f"CSV file not found at path: {file_path}"
             logger.error(error_msg)
             job.status = "failed"
-            pass  # Progress tracking hook
+            job.progress = "100%"
             job.error_message = error_msg
             job.completed_at = datetime.now(timezone.utc)
             db.commit()
@@ -57,13 +57,13 @@ def process_csv_job(job_id_str: str) -> str:
             cleaned_rows, raw_count, cleaned_count = clean_csv(file_path)
             job.row_count_raw = raw_count
             job.row_count_clean = cleaned_count
-            pass  # Progress tracking hook
+            job.progress = "30%"
             db.commit()
         except Exception as e:
             error_msg = f"Data cleaning failed: {str(e)}"
             logger.error(error_msg, exc_info=True)
             job.status = "failed"
-            pass  # Progress tracking hook
+            job.progress = "100%"
             job.error_message = error_msg
             job.completed_at = datetime.now(timezone.utc)
             db.commit()
@@ -72,7 +72,7 @@ def process_csv_job(job_id_str: str) -> str:
         # Step 2: Anomaly Detection (Multi-Currency & Domestic Rules)
         logger.info(f"Detecting anomalies for job: {job.id}")
         detect_anomalies(cleaned_rows)
-        pass  # Progress tracking hook
+        job.progress = "50%"
         db.commit()
 
         # Step 3: LLM Batch Category Classification (with Safe ID Lookup)
@@ -105,7 +105,7 @@ def process_csv_job(job_id_str: str) -> str:
                     target_row["llm_raw_response"] = raw_resp
                     target_row["llm_failed"] = is_failed_llm
 
-        pass  # Progress tracking hook
+        job.progress = "75%"
         db.commit()
 
         # Step 4: Spend Aggregation & Statistical Verification
@@ -154,7 +154,7 @@ def process_csv_job(job_id_str: str) -> str:
 
         # Step 5: Executive AI Summary & Risk Assessment
         logger.info(f"Generating LLM summary for job: {job.id}")
-        pass  # Progress tracking hook
+        job.progress = "90%"
         db.commit()
         
         summary_result = generate_job_summary(stats_summary, cleaned_rows, anomaly_count)
@@ -198,7 +198,7 @@ def process_csv_job(job_id_str: str) -> str:
         db.add_all(db_transactions)
         db.add(job_summary)
         job.status = "completed"
-        pass  # Progress tracking hook
+        job.progress = "100%"
         job.completed_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -212,7 +212,7 @@ def process_csv_job(job_id_str: str) -> str:
             job = db.query(Job).filter(Job.id == job_uuid).first()
             if job:
                 job.status = "failed"
-                pass  # Progress tracking hook
+                job.progress = "100%"
                 job.error_message = f"Fatal system error: {str(e)}"
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
