@@ -236,3 +236,74 @@ def get_job_results(
         total_anomalies=total_anomalies
     )
 
+@router.post("/{job_id}/retry", status_code=status.HTTP_200_OK)
+def retry_job(
+    job_id: UUID,
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Retries processing a failed or incomplete job.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Job not found"
+        )
+
+    # Ownership check
+    verify_job_ownership(job, user_id)
+
+    file_path = os.path.join(settings.UPLOAD_DIR, f"{job.id}.csv")
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Source file no longer exists for this job. Please upload the file again."
+        )
+
+    # Clean existing transactions if retrying
+    db.query(Transaction).filter(Transaction.job_id == job_id).delete()
+    db.query(JobSummary).filter(JobSummary.job_id == job_id).delete()
+
+    job.status = "pending"
+    job.progress = "0%"
+    job.error_message = None
+    job.completed_at = None
+    db.commit()
+
+    process_csv_job.delay(str(job.id))
+    return {"message": "Job retry enqueued successfully", "job_id": job.id}
+
+@router.get("", response_model=JobListResponse)
+def list_jobs(
+    status: Optional[str] = None,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    user_id: str = Depends(get_current_user_id),
+    db: Session = Depends(get_db)
+):
+    query = db.query(Job)
+    
+    # Filter by user ownership (users see their own jobs and default/unowned jobs)
+    if user_id:
+        query = query.filter((Job.owner_id == user_id) | (Job.owner_id.is_(None)))
+
+    if status:
+        query = query.filter(Job.status == status.strip().lower())
+
+    total = query.count()
+    offset = (page - 1) * size
+    
+    jobs = query.order_by(desc(Job.created_at)).offset(offset).limit(size).all()
+    pages = (total + size - 1) // size if total > 0 else 0
+
+    return JobListResponse(
+        jobs=[JobListItem.model_validate(j) for j in jobs],
+        metadata=PaginationMetadata(
+            total=total,
+            page=page,
+            size=size,
+            pages=pages
+        )
+    )
