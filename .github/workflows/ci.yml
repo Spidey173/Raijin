@@ -1,0 +1,52 @@
+name: Raijin CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Test & Verify (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Configure Environment for Testing
+        run: |
+          cp .env.example .env
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate Python Syntax & Bytecode Compilation
+        run: |
+          python -m py_compile app/main.py app/config.py app/tasks.py app/database.py app/celery_app.py app/auth.py
+          find app -name "*.py" -exec python -m py_compile {} +
+
+      - name: Validate Alembic Migrations (Static DDL)
+        run: |
+          python -m alembic upgrade head --sql
+
+      - name: Run Test Suite
+        run: |
+          pytest -v
+
+      - name: Validate Docker Compose Configuration
+        run: |
+          docker compose config
