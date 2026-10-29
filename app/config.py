@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     # Allowed CORS Origins
     CORS_ORIGINS: str = Field(default="*")
     
+    # Cryptographic Authentication & Security
+    SECRET_KEY: str = Field(default="raijin-production-secure-jwt-secret-key-32-chars")
+    JWT_ALGORITHM: str = Field(default="HS256")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=60 * 24)  # 24 hours
+    API_KEY: str = Field(default="")  # Optional service-to-service master API key
+    ENABLE_ANONYMOUS_DEV_MODE: bool = Field(default=False)  # Allows default-user only when explicitly enabled
+
+    
     @property
     def DATABASE_URL(self) -> str:
         return f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"

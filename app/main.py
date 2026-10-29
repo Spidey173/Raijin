@@ -1,6 +1,6 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import jobs_router
+from app.routers import jobs_router, auth_router
 from app.config import settings
 
 app = FastAPI(
@@ -22,6 +22,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth_router)
 app.include_router(jobs_router)
 
 @app.get("/health", status_code=status.HTTP_200_OK, tags=["Health"])

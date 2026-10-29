@@ -6,6 +6,7 @@ from fastapi import status
 from app.models.job import Job
 from app.models.transaction import Transaction
 from app.models.summary import JobSummary
+from app.auth import create_access_token
 
 def test_health_check(client):
     response = client.get("/health")
@@ -257,10 +258,13 @@ def test_job_ownership_enforcement(client, db):
     db.add(summary)
     db.commit()
 
-    # Bob tries to access Alice's job status -> 403 Forbidden
+    alice_token = create_access_token("alice")
+    bob_token = create_access_token("bob")
+
+    # Bob tries to access Alice's job status with Bob's valid JWT -> 403 Forbidden
     response_bob = client.get(
         f"/jobs/{alice_job_id}/status",
-        headers={"X-User-ID": "bob"}
+        headers={"Authorization": f"Bearer {bob_token}"}
     )
     assert response_bob.status_code == 403
     assert "Forbidden" in response_bob.json()["detail"]
@@ -268,15 +272,15 @@ def test_job_ownership_enforcement(client, db):
     # Bob tries to access Alice's job results -> 403 Forbidden
     results_bob = client.get(
         f"/jobs/{alice_job_id}/results",
-        headers={"X-User-ID": "bob"}
+        headers={"Authorization": f"Bearer {bob_token}"}
     )
     assert results_bob.status_code == 403
     assert "Forbidden" in results_bob.json()["detail"]
 
-    # Alice accesses her own job status -> 200 OK
+    # Alice accesses her own job status with Alice's valid JWT -> 200 OK
     response_alice = client.get(
         f"/jobs/{alice_job_id}/status",
-        headers={"X-User-ID": "alice"}
+        headers={"Authorization": f"Bearer {alice_token}"}
     )
     assert response_alice.status_code == 200
     assert response_alice.json()["owner_id"] == "alice"
@@ -288,15 +292,18 @@ def test_list_jobs_ownership_isolation(client, db):
     db.add(job_bob)
     db.commit()
 
+    alice_token = create_access_token("alice")
+    bob_token = create_access_token("bob")
+
     # Alice lists jobs -> sees only Alice's job
-    res_alice = client.get("/jobs", headers={"X-User-ID": "alice"})
+    res_alice = client.get("/jobs", headers={"Authorization": f"Bearer {alice_token}"})
     assert res_alice.status_code == 200
     alice_job_ids = [j["id"] for j in res_alice.json()["jobs"]]
     assert str(job_alice.id) in alice_job_ids
     assert str(job_bob.id) not in alice_job_ids
 
     # Bob lists jobs -> sees only Bob's job
-    res_bob = client.get("/jobs", headers={"X-User-ID": "bob"})
+    res_bob = client.get("/jobs", headers={"Authorization": f"Bearer {bob_token}"})
     assert res_bob.status_code == 200
     bob_job_ids = [j["id"] for j in res_bob.json()["jobs"]]
     assert str(job_bob.id) in bob_job_ids

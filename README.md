@@ -148,14 +148,38 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## 📖 Step-by-Step API Walkthrough
 
-Here is how to test the pipeline using `curl` or [Swagger UI](http://localhost:8000/docs).
+Here is how to authenticate and test the pipeline using `curl` or [Swagger UI](http://localhost:8000/docs).
 
-### 1. Upload a CSV Statement
-Raijin includes a ready-to-test sample statement: [`transactions.csv`](file:///Users/spidey./Downloads/Spidey/Raijin/transactions.csv).
+### 1. Authenticate & Obtain a Signed JWT Token
+Raijin implements cryptographic authentication (HS256 JWT tokens). Obtain an access token for your user or tenant identity:
 
 ```bash
+curl -X POST "http://localhost:8000/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "john_doe"}'
+```
+**Response:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer",
+  "user_id": "john_doe",
+  "expires_in_seconds": 86400
+}
+```
+
+> **Security Note:** Every request verifies the cryptographic signature of the Bearer token. Unauthenticated callers cannot spoof `X-User-ID` or impersonate another tenant.
+
+---
+
+### 2. Upload a CSV Statement
+Save your token in a shell variable and upload a statement (Raijin includes a ready-to-test sample: [`transactions.csv`](file:///Users/spidey./Downloads/Spidey/Raijin/transactions.csv)):
+
+```bash
+TOKEN="<paste_access_token_here>"
+
 curl -X POST "http://localhost:8000/jobs/upload" \
-  -H "X-User-ID: john_doe" \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@transactions.csv"
 ```
 **Response:**
@@ -167,12 +191,12 @@ curl -X POST "http://localhost:8000/jobs/upload" \
 
 ---
 
-### 2. Check Job Progress & Status
+### 3. Check Job Progress & Status
 Track your job in real-time as it advances through progress stages (`10%` -> `30%` -> `50%` -> `75%` -> `90%` -> `100%`):
 
 ```bash
 curl "http://localhost:8000/jobs/bc14f44e-71e3-4e09-9d6e-c833ef8e6be8/status" \
-  -H "X-User-ID: john_doe"
+  -H "Authorization: Bearer $TOKEN"
 ```
 **Response (When Completed):**
 ```json
@@ -204,7 +228,7 @@ Results are paginated directly at the database engine so large datasets load ins
 
 ```bash
 curl "http://localhost:8000/jobs/bc14f44e-71e3-4e09-9d6e-c833ef8e6be8/results?page=1&size=5" \
-  -H "X-User-ID: john_doe"
+  -H "Authorization: Bearer $TOKEN"
 ```
 **Response Preview:**
 ```json
@@ -243,7 +267,7 @@ If a network blip or API timeout interrupted a job, you can retry it without re-
 
 ```bash
 curl -X POST "http://localhost:8000/jobs/bc14f44e-71e3-4e09-9d6e-c833ef8e6be8/retry" \
-  -H "X-User-ID: john_doe"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
@@ -253,7 +277,7 @@ Users only see jobs they own:
 
 ```bash
 curl "http://localhost:8000/jobs?status=completed&page=1&size=10" \
-  -H "X-User-ID: john_doe"
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 ---
